@@ -1,0 +1,15 @@
+#btnam{
+    background: #FF6B00;
+    color: white; font-family: 'Baloo 2', sans-serif;
+    font-size: 16px; font-weight: 700;
+    padding: 14px 32px; border-radius: 50px;
+    border: 2.5px solid #3D2314;
+    box-shadow: 4px 4px 0 #3D2314;
+    cursor: pointer; text-decoration: none;
+    transition: transform 0.1s, box-shadow 0.1s;
+    display: inline-block;
+    background: #F5A623 ; border-color:white;
+    position: relative;
+    z-index: 2;
+
+  }
