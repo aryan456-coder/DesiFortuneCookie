@@ -203,15 +203,6 @@ DELETE /api/reviews/:id
 
 ---
 
-## 📸 Screenshots
-
-Add screenshots of:
-- Hero Section
-- Fortune Cookie Cracker
-- Reviews Section
-- Mobile View
-
----
 
 ## 👨‍💻 Author
 
