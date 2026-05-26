@@ -1,4 +1,5 @@
 const express = require("express");
+const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
 const dotenv = require("dotenv");
 
@@ -53,6 +54,15 @@ app.get("/api/reviews", (req, res) => {
   const limit = Math.max(1, parseInt(req.query.limit) || 5);
   const offset = (page - 1) * limit;
 
+  // Parse ownership tokens from header
+  let clientTokens = [];
+  try {
+    const header = req.headers["x-review-tokens"];
+    if (header) clientTokens = JSON.parse(header);
+  } catch (e) {
+    // Ignore malformed header
+  }
+
   db.query("SELECT COUNT(*) AS total FROM reviews", (err, countResult) => {
     if (err) {
       console.error("GET /api/reviews COUNT error:", err);
@@ -63,7 +73,7 @@ app.get("/api/reviews", (req, res) => {
     const totalPages = Math.ceil(total / limit);
 
     db.query(
-      "SELECT `id`, `name`, `rating`, `message` AS `text`, `created_at` FROM reviews ORDER BY `id` DESC LIMIT ? OFFSET ?",
+      "SELECT `id`, `name`, `rating`, `message` AS `text`, `created_at`, `ownership_token` FROM reviews ORDER BY `id` DESC LIMIT ? OFFSET ?",
       [limit, offset],
       (err2, reviews) => {
         if (err2) {
@@ -71,7 +81,16 @@ app.get("/api/reviews", (req, res) => {
           return res.status(500).json({ message: err2.message });
         }
 
-        res.json({ reviews, totalPages, currentPage: page });
+        // Add isOwner flag, strip ownership_token from response
+        const safeReviews = reviews.map((r) => {
+          const isOwner =
+            r.ownership_token !== null &&
+            clientTokens.includes(r.ownership_token);
+          const { ownership_token, ...rest } = r;
+          return { ...rest, isOwner };
+        });
+
+        res.json({ reviews: safeReviews, totalPages, currentPage: page });
       }
     );
   });
@@ -85,10 +104,11 @@ app.post("/api/reviews", (req, res) => {
   const name = req.body.name && req.body.name.trim() ? req.body.name.trim() : "Anonymous Beta";
   const rating = Number(req.body.rating);
   const text = req.body.text.trim();
+  const ownership_token = uuidv4();
 
   db.query(
-    "INSERT INTO reviews (`name`, `rating`, `message`) VALUES (?, ?, ?)",
-    [name, rating, text],
+    "INSERT INTO reviews (`name`, `rating`, `message`, `ownership_token`) VALUES (?, ?, ?, ?)",
+    [name, rating, text, ownership_token],
     (err, result) => {
       if (err) {
         console.error("POST /api/reviews error:", err);
@@ -100,6 +120,7 @@ app.post("/api/reviews", (req, res) => {
         name,
         rating,
         text,
+        ownership_token,
       });
     }
   );
@@ -112,43 +133,78 @@ app.put("/api/reviews/:id", (req, res) => {
   }
 
   const id = req.params.id;
-  const name = req.body.name && req.body.name.trim() ? req.body.name.trim() : "Anonymous Beta";
-  const rating = Number(req.body.rating);
-  const text = req.body.text.trim();
+  const clientToken = req.headers["x-review-token"];
 
   db.query(
-    "UPDATE reviews SET `name` = ?, `rating` = ?, `message` = ? WHERE `id` = ?",
-    [name, rating, text, id],
-    (err, result) => {
+    "SELECT `ownership_token` FROM reviews WHERE `id` = ?",
+    [id],
+    (err, rows) => {
       if (err) {
-        console.error("PUT /api/reviews error:", err);
+        console.error("PUT /api/reviews token check error:", err);
         return res.status(500).json({ message: err.message });
       }
 
-      if (result.affectedRows === 0) {
+      if (rows.length === 0) {
         return res.status(404).json({ message: "Review not found." });
       }
 
-      res.json({ id: Number(id), name, rating, text });
+      const storedToken = rows[0].ownership_token;
+      if (!storedToken || storedToken !== clientToken) {
+        return res.status(403).json({ message: "You are not allowed to edit this review." });
+      }
+
+      const name = req.body.name && req.body.name.trim() ? req.body.name.trim() : "Anonymous Beta";
+      const rating = Number(req.body.rating);
+      const text = req.body.text.trim();
+
+      db.query(
+        "UPDATE reviews SET `name` = ?, `rating` = ?, `message` = ? WHERE `id` = ?",
+        [name, rating, text, id],
+        (err2, result) => {
+          if (err2) {
+            console.error("PUT /api/reviews error:", err2);
+            return res.status(500).json({ message: err2.message });
+          }
+
+          res.json({ id: Number(id), name, rating, text });
+        }
+      );
     }
   );
 });
 
 app.delete("/api/reviews/:id", (req, res) => {
   const id = req.params.id;
+  const clientToken = req.headers["x-review-token"];
 
-  db.query("DELETE FROM reviews WHERE `id` = ?", [id], (err, result) => {
-    if (err) {
-      console.error("DELETE /api/reviews error:", err);
-      return res.status(500).json({ message: err.message });
+  db.query(
+    "SELECT `ownership_token` FROM reviews WHERE `id` = ?",
+    [id],
+    (err, rows) => {
+      if (err) {
+        console.error("DELETE /api/reviews token check error:", err);
+        return res.status(500).json({ message: err.message });
+      }
+
+      if (rows.length === 0) {
+        return res.status(404).json({ message: "Review not found." });
+      }
+
+      const storedToken = rows[0].ownership_token;
+      if (!storedToken || storedToken !== clientToken) {
+        return res.status(403).json({ message: "You are not allowed to delete this review." });
+      }
+
+      db.query("DELETE FROM reviews WHERE `id` = ?", [id], (err2, result) => {
+        if (err2) {
+          console.error("DELETE /api/reviews error:", err2);
+          return res.status(500).json({ message: err2.message });
+        }
+
+        res.json({ message: "Review deleted successfully." });
+      });
     }
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Review not found." });
-    }
-
-    res.json({ message: "Review deleted successfully." });
-  });
+  );
 });
 
 const PORT = process.env.PORT || 5000; 

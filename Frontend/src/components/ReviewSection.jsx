@@ -4,6 +4,32 @@ import axios from "axios";
 import ReviewForm from "./ReviewForm";
 import ReviewCard from "./ReviewCard";
 
+function getAllReviewTokens() {
+  try {
+    const tokens = JSON.parse(localStorage.getItem("review_tokens") || "{}");
+    return Object.values(tokens);
+  } catch {
+    return [];
+  }
+}
+
+function saveReviewToken(id, token) {
+  const tokens = JSON.parse(localStorage.getItem("review_tokens") || "{}");
+  tokens[id] = token;
+  localStorage.setItem("review_tokens", JSON.stringify(tokens));
+}
+
+function getReviewToken(id) {
+  const tokens = JSON.parse(localStorage.getItem("review_tokens") || "{}");
+  return tokens[id] || null;
+}
+
+function removeReviewToken(id) {
+  const tokens = JSON.parse(localStorage.getItem("review_tokens") || "{}");
+  delete tokens[id];
+  localStorage.setItem("review_tokens", JSON.stringify(tokens));
+}
+
 function ReviewSection() {
   const [reviews, setReviews] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -12,7 +38,11 @@ function ReviewSection() {
 
   function fetchReviews(page = 1) {
     axios
-      .get(`${import.meta.env.VITE_API_URL}/api/reviews?page=${page}&limit=5`)
+      .get(`${import.meta.env.VITE_API_URL}/api/reviews?page=${page}&limit=5`, {
+        headers: {
+          "X-Review-Tokens": JSON.stringify(getAllReviewTokens()),
+        },
+      })
       .then((res) => {
         setReviews(res.data.reviews);
         setCurrentPage(res.data.currentPage);
@@ -24,6 +54,10 @@ function ReviewSection() {
   useEffect(() => {
     fetchReviews(currentPage);
   }, [currentPage]);
+
+  function handleTokenReceived(id, token) {
+    saveReviewToken(id, token);
+  }
 
   function handleReviewSuccess() {
     setEditingReview(null);
@@ -39,11 +73,18 @@ function ReviewSection() {
   }
 
   function handleDelete(id) {
+    const token = getReviewToken(id);
+
     setReviews((prev) => prev.filter((r) => r.id !== id));
 
     axios
-      .delete(`${import.meta.env.VITE_API_URL}/api/reviews/${id}`)
+      .delete(`${import.meta.env.VITE_API_URL}/api/reviews/${id}`, {
+        headers: {
+          "X-Review-Token": token,
+        },
+      })
       .then(() => {
+        removeReviewToken(id);
         fetchReviews(currentPage);
       })
       .catch((err) => {
@@ -66,6 +107,7 @@ function ReviewSection() {
 
           <ReviewForm
             onSuccess={handleReviewSuccess}
+            onTokenReceived={handleTokenReceived}
             editingReview={editingReview}
             onCancelEdit={handleCancelEdit}
           />
@@ -85,8 +127,8 @@ function ReviewSection() {
             <ReviewCard
               key={item.id}
               data={item}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
+              onEdit={item.isOwner ? handleEdit : undefined}
+              onDelete={item.isOwner ? handleDelete : undefined}
             />
           ))
         )}

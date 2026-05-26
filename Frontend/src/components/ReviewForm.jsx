@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-function ReviewForm({ onSuccess, editingReview, onCancelEdit }) {
+function ReviewForm({ onSuccess, onTokenReceived, editingReview, onCancelEdit }) {
   const [name, setName] = useState("");
   const [rating, setRating] = useState("");
   const [text, setText] = useState("");
@@ -29,12 +29,29 @@ function ReviewForm({ onSuccess, editingReview, onCancelEdit }) {
 
     try {
       if (editingReview) {
+      
+        const tokens = JSON.parse(localStorage.getItem("review_tokens") || "{}");
+        const token = tokens[editingReview.id] || null;
+
         await axios.put(
           `${import.meta.env.VITE_API_URL}/api/reviews/${editingReview.id}`,
-          reviewData
+          reviewData,
+          {
+            headers: {
+              "X-Review-Token": token,
+            },
+          }
         );
       } else {
-        await axios.post(`${import.meta.env.VITE_API_URL}/api/reviews`, reviewData);
+      
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_URL}/api/reviews`,
+          reviewData
+        );
+
+        if (res.data.ownership_token && onTokenReceived) {
+          onTokenReceived(res.data.id, res.data.ownership_token);
+        }
       }
 
       setName("");
