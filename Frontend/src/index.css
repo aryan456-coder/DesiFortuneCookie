@@ -57,23 +57,30 @@ body::before {
   @media (max-width: 600px) {
 
   nav {
-    padding: 0 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 10px 16px;
     height: auto;
     min-height: 60px;
-    gap: 10px;
+    row-gap: 8px;
   }
 
   .nav-logo {
     font-size: 15px;
     gap: 5px;
     white-space: nowrap;
+    flex: 1 1 auto;
+    justify-content: center;
   }
 
   .nav-links {
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 12px;
     margin: 0;
     padding: 0;
     align-items: center;
+    width: 100%;
   }
 
   .nav-links a {
