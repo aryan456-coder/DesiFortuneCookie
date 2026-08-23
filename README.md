@@ -6,7 +6,7 @@ A fun full-stack web application that serves random "Aunty Ji" style fortunes wi
 
 Frontend: https://desi-fortune-cookie.vercel.app/
 
-Backend API: https://desifortunecookie-production.up.railway.app
+Backend API: https://desifortunecookie.onrender.com
 
 ---
 
