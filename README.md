@@ -30,8 +30,8 @@ Backend API: https://desifortunecookie.onrender.com
 
 ### ☁️ Deployment
 - Frontend deployed on Vercel
-- Backend deployed on Railway
-- MySQL database hosted on Railway
+- Backend deployed on Render
+- MySQL database hosted on TiDB Cloud
 
 ---
 
